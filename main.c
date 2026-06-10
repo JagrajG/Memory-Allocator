@@ -9,6 +9,7 @@ uint8_t heap[HEAP_SIZE];
 // keep track of how many of the HEAP_Size is used so we do not exceed it
 size_t heap_used = 0;
 
+struct Header *head = NULL;
 struct Header
 {
     // size of user memory, not including header
@@ -44,10 +45,24 @@ void *my_malloc(size_t size)
     header->is_free = 0;
     header->next = NULL;
 
-    // update total allocation size
+    // link to previous block
+    if (head == NULL)
+    {
+        head = header;
+    }
+    else
+    {
+        struct Header *current = head;
+        while (current->next != NULL)
+        {
+            current = current->next;
+        }
+        current->next = header;
+    }
+
     heap_used += header->size + sizeof(struct Header);
 
-    return header;
+    return (void *)(header + 1);
 }
 
 int main(void)
