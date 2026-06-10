@@ -23,11 +23,39 @@ uint8_t heap[HEAP_SIZE];
 // keep track of how many of the HEAP_Size is used so we do not exceed it
 size_t heap_used = 0;
 
+struct Header *find_free_block(size_t size)
+
+{
+    struct Header *current = head;
+
+    if (size == 0)
+    {
+        return NULL;
+    }
+
+    while (current != NULL)
+    {
+        if (current->is_free == 1 && current->size >= size)
+        {
+            return current;
+        }
+        current = current->next;
+    }
+    return NULL;
+}
+
 void *my_malloc(size_t size)
 {
     if (size == 0)
     {
         return NULL;
+    }
+
+    struct Header *free_block = find_free_block(size);
+    if (free_block != NULL)
+    {
+        free_block->is_free = 0;
+        return (void *)(free_block + 1);
     }
 
     size_t total_size = sizeof(struct Header) + size;
@@ -101,15 +129,32 @@ int main(void)
 {
     void *a = my_malloc(100);
     void *b = my_malloc(50);
-    void *c = my_malloc(4096);
-    void *d = my_malloc(0);
 
-    printf("a = %p\n", a);
-    printf("b = %p\n", b);
-    printf("c = %p\n", c);
-    printf("d = %p\n", d);
+    printf("After two allocations:\n");
+    heap_dump();
 
     my_free(a);
 
+    printf("\nAfter freeing a:\n");
     heap_dump();
+
+    void *c = my_malloc(80);
+
+    printf("\nAfter allocating 80 bytes:\n");
+    heap_dump();
+
+    printf("\na = %p\n", a);
+    printf("b = %p\n", b);
+    printf("c = %p\n", c);
+
+    if (a == c)
+    {
+        printf("PASS: c reused a's block\n");
+    }
+    else
+    {
+        printf("FAIL: c did not reuse a's block\n");
+    }
+
+    return 0;
 }
