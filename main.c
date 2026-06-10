@@ -6,6 +6,9 @@
 
 uint8_t heap[HEAP_SIZE];
 
+// keep track of how many of the HEAP_Size is used so we do not exceed it
+size_t heap_used = 0;
+
 struct Header
 {
     // size of user memory, not including header
@@ -17,3 +20,47 @@ struct Header
     // pointer to next block
     struct Header *next;
 };
+
+void *my_malloc(size_t size)
+{
+    if (size == 0)
+    {
+        return NULL;
+    }
+
+    size_t total_size = sizeof(struct Header) + size;
+
+    if (total_size + heap_used > HEAP_SIZE)
+    {
+        return NULL;
+    }
+    // create the meta data
+
+    // create a pointer to a Header called header
+    // header takes the shape of Header
+    // heap + heap_used is used to find the next open spot in memory
+    struct Header *header = (struct Header *)(heap + heap_used);
+    header->size = size;
+    header->is_free = 0;
+    header->next = NULL;
+
+    // update total allocation size
+    heap_used += header->size + sizeof(struct Header);
+
+    return header;
+}
+
+int main(void)
+{
+    void *a = my_malloc(100);
+    void *b = my_malloc(50);
+    void *c = my_malloc(4096);
+    void *d = my_malloc(0);
+
+    printf("a = %p\n", a);
+    printf("b = %p\n", b);
+    printf("c = %p\n", c);
+    printf("d = %p\n", d);
+
+    return 0;
+}
