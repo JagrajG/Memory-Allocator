@@ -1,20 +1,5 @@
 #include <stdio.h>
-#include <stdint.h>
-#include <stddef.h>
-
-#define HEAP_SIZE 4096
-
-struct Header
-{
-    // size of user memory, not including header
-    size_t size;
-
-    // 0 = used, 1 = free
-    uint8_t is_free;
-
-    // pointer to next block
-    struct Header *next;
-};
+#include "allocator.h"
 
 struct Header *head = NULL;
 
@@ -23,11 +8,7 @@ uint8_t heap[HEAP_SIZE];
 // keep track of how many of the HEAP_Size is used so we do not exceed it
 size_t heap_used = 0;
 
-// function prototypes
-void split_block(struct Header *block, size_t requested_size);
-
 struct Header *find_free_block(size_t size)
-
 {
     struct Header *current = head;
 
@@ -95,9 +76,32 @@ void *my_malloc(size_t size)
         current->next = header;
     }
 
-    heap_used += header->size + sizeof(struct Header);
+    heap_used += total_size;
 
     return (void *)(header + 1);
+}
+
+void coalesce_free_blocks(void)
+{
+    struct Header *current = head;
+
+    if (current == NULL)
+    {
+        return;
+    }
+    while (current != NULL && current->next != NULL)
+    {
+        if (current->is_free == 1 && current->next->is_free == 1)
+        {
+            struct Header *next_block = current->next;
+            current->size = current->size + sizeof(struct Header) + next_block->size;
+            current->next = next_block->next;
+        }
+        else
+        {
+            current = current->next;
+        }
+    }
 }
 
 void split_block(struct Header *block, size_t requested_size)
@@ -110,18 +114,19 @@ void split_block(struct Header *block, size_t requested_size)
 
     size_t leftover = block->size - requested_size - sizeof(struct Header);
 
-    struct Header *old_block = block->next;
+    struct Header *old_next = block->next;
 
     uint8_t *new_header_address = (uint8_t *)(block + 1) + requested_size;
     struct Header *new_block = (struct Header *)new_header_address;
 
     new_block->size = leftover;
     new_block->is_free = 1;
-    new_block->next = old_block;
+    new_block->next = old_next;
 
     block->size = requested_size;
     block->next = new_block;
 }
+
 void my_free(void *ptr)
 {
     if (ptr == NULL)
@@ -131,6 +136,8 @@ void my_free(void *ptr)
 
     struct Header *header = ((struct Header *)ptr) - 1;
     header->is_free = 1;
+
+    coalesce_free_blocks();
 }
 
 void heap_dump(void)
@@ -151,64 +158,4 @@ void heap_dump(void)
     }
 
     printf("heap_used: %zu / %d\n", heap_used, HEAP_SIZE);
-}
-
-void check(int condition, const char *message)
-{
-    if (condition)
-    {
-        printf("PASS: %s\n", message);
-    }
-    else
-    {
-        printf("FAIL: %s\n", message);
-    }
-}
-int main(void)
-{
-    printf("Header size: %zu\n\n", sizeof(struct Header));
-
-    void *a = my_malloc(100);
-    void *b = my_malloc(50);
-
-    printf("After two allocations:\n");
-    heap_dump();
-
-    check(a != NULL, "my_malloc(100) returns non-NULL");
-    check(b != NULL, "my_malloc(50) returns non-NULL");
-    check(heap_used == 198, "heap_used is 198 after 100 and 50 byte allocations");
-
-    my_free(a);
-
-    printf("\nAfter freeing a:\n");
-    heap_dump();
-
-    check(head->is_free == 1, "first block is marked free after my_free(a)");
-    check(head->next->is_free == 0, "second block is still used");
-
-    void *c = my_malloc(40);
-
-    printf("\nAfter allocating 40 bytes:\n");
-    heap_dump();
-
-    check(c == a, "c reused a's old block");
-    check(heap_used == 198, "heap_used did not increase after reuse/split");
-    check(head->size == 40, "first block was shrunk to 40 bytes");
-    check(head->is_free == 0, "first block is used again");
-    check(head->next != NULL, "split created a new leftover block");
-    check(head->next->size == 36, "leftover block has 36 bytes");
-    check(head->next->is_free == 1, "leftover block is free");
-    check(head->next->next != NULL, "leftover block points to original second block");
-    check(head->next->next->size == 50, "original second block is still 50 bytes");
-
-    void *d = my_malloc(0);
-    check(d == NULL, "my_malloc(0) returns NULL");
-
-    void *e = my_malloc(4096);
-    check(e == NULL, "my_malloc(4096) returns NULL");
-
-    my_free(NULL);
-    check(1, "my_free(NULL) does not crash");
-
-    return 0;
 }
