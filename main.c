@@ -104,7 +104,7 @@ void split_block(struct Header *block, size_t requested_size)
 
     size_t leftover = block->size - requested_size - sizeof(struct Header);
 
-    struct Header *block_size = block->size;
+    size_t *block_size = block->size;
     struct Header *next_block = block->next;
 }
 void my_free(void *ptr)
